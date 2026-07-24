@@ -46,7 +46,7 @@ jobs:
       - name: ⚙ 设置 Node.js / Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "pnpm"
           cache-dependency-path: "./mail-worker/pnpm-lock.yaml"
 
@@ -200,6 +200,18 @@ jobs:
           
           sed -i "s|\${D1_DATABASE_ID}|$D1_ID|g" "$CONFIG_FILE"
           echo "✅ Setup completed."
+
+      - name: 🪣 设置R2存储桶 / Set up R2 bucket
+        if: env.R2_BUCKET_NAME != ''
+        working-directory: ./mail-worker
+        run: |
+          echo "🔍 Checking R2 bucket..."
+          if pnpm wrangler r2 bucket list | grep -Fq "$R2_BUCKET_NAME"; then
+            echo "✅ R2 bucket $R2_BUCKET_NAME already exists."
+          else
+            pnpm wrangler r2 bucket create "$R2_BUCKET_NAME"
+            echo "✅ R2 bucket $R2_BUCKET_NAME created."
+          fi
 
       - name: 🚀 开始部署 / Start deployment
         id: deploy
