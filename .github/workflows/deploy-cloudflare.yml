@@ -261,6 +261,35 @@ jobs:
             exit 1
           fi
 
+      - name: 📨 配置邮件路由 / Configure Email Routing
+        run: |
+          ZONE_NAME=$(jq -r '.[0]' <<< "$DOMAIN")
+          ZONE_ID=$(curl -fsS \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones?name=$ZONE_NAME" \
+            | jq -er '.result[0].id')
+
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/email/routing/dns" \
+            | jq -e '.success == true' >/dev/null
+
+          jq -n --arg worker "$NAME" '{
+            name: "Cloud Mail catch-all",
+            enabled: true,
+            matchers: [{type: "all"}],
+            actions: [{type: "worker", value: [$worker]}]
+          }' > routing.json
+
+          curl -fsS -X PUT \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data @routing.json \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/email/routing/rules/catch_all" \
+            | jq -e '.success == true and .result.enabled == true' >/dev/null
+
+          echo "✅ Email Routing catch-all now sends $ZONE_NAME mail to $NAME."
+
       - name: 🗑️ 删除运行记录 / Delete workflow runs
         uses: GitRML/delete-workflow-runs@main
         continue-on-error: true
