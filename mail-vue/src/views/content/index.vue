@@ -1,5 +1,5 @@
 <template>
-  <div class="box">
+  <div class="box" v-loading="detailLoading">
     <div class="header-actions">
       <Icon class="icon" icon="material-symbols-light:arrow-back-ios-new" width="20" height="20" @click="handleBack"/>
       <Icon v-perm="'email:delete'" class="icon" icon="uiw:delete" width="16" height="16" @click="handleDelete"/>
@@ -88,7 +88,7 @@ import {getExtName, formatBytes} from "@/utils/file-utils.js";
 import {cvtR2Url,toOssDomain} from "@/utils/convert.js";
 import {getIconByName} from "@/utils/icon-utils.js";
 import {useSettingStore} from "@/store/setting.js";
-import {allEmailDelete} from "@/request/all-email.js";
+import {allEmailDelete, allEmailDetail, allEmailRead} from "@/request/all-email.js";
 import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
@@ -98,19 +98,50 @@ const settingStore = useSettingStore();
 const accountStore = useAccountStore();
 const emailStore = useEmailStore();
 const router = useRouter()
-const email = emailStore.contentData.email
+const email = reactive(emailStore.contentData.email || {
+  emailId: 0,
+  subject: '',
+  name: '',
+  sendEmail: '',
+  recipient: '[]',
+  content: '',
+  text: '',
+  attList: [],
+  unread: EmailUnreadEnum.READ
+})
+email.attList = email.attList || email.attachments || []
+email.recipient = email.recipient || '[]'
+if (!emailStore.contentData.email) emailStore.contentData.email = email
 const showPreview = ref(false)
 const srcList = reactive([])
+const detailLoading = ref(false)
 
 const { t } = useI18n()
 watch(() => accountStore.currentAccountId, () => {
   handleBack()
 })
 
-onMounted(() => {
+onMounted(async () => {
+  if (emailStore.contentData.delType === 'admin' && email.emailId) {
+    detailLoading.value = true
+    try {
+      const detail = await allEmailDetail(email.emailId)
+      Object.assign(email, detail, {
+        attList: detail.attList || detail.attachments || []
+      })
+      emailStore.contentData.email = email
+    } finally {
+      detailLoading.value = false
+    }
+  }
+
   if (emailStore.contentData.showUnread && email.unread === EmailUnreadEnum.UNREAD) {
     email.unread = EmailUnreadEnum.READ;
-    emailRead([email.emailId]);
+    if (emailStore.contentData.delType === 'admin') {
+      allEmailRead([email.emailId])
+    } else {
+      emailRead([email.emailId]);
+    }
   }
 })
 
@@ -127,7 +158,12 @@ function openForward() {
 }
 
 function toMessage(message) {
-  return  message ? JSON.parse(message).message : '';
+  if (!message) return '';
+  try {
+    return JSON.parse(message).message || '';
+  } catch {
+    return message;
+  }
 }
 
 function formatImage(content) {
@@ -149,8 +185,13 @@ function isImage(filename) {
 }
 
 function formateReceive(recipient) {
-  recipient = JSON.parse(recipient)
-  return recipient.map(item => item.address).join(', ')
+  if (!recipient) return ''
+  try {
+    const parsed = typeof recipient === 'string' ? JSON.parse(recipient) : recipient
+    return Array.isArray(parsed) ? parsed.map(item => item.address).filter(Boolean).join(', ') : ''
+  } catch {
+    return ''
+  }
 }
 
 function changeStar() {
@@ -200,7 +241,7 @@ const handleDelete = () => {
       })
     } else  {
 
-      allEmailDelete(email.emailId).then(() => {
+      allEmailDelete(email.emailId, emailStore.contentData.delType === 'admin').then(() => {
         ElMessage({
           message: t('delSuccessMsg'),
           type: 'success',

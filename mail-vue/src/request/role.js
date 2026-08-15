@@ -1,30 +1,38 @@
 import http from '@/axios/index.js';
+import {isAdminSession} from '@/request/admin.js'
 
 export function roleAdd(params) {
-    return http.post('/role/add',params)
+    if (!isAdminSession()) return http.post('/role/add',params)
+    return http.post('/admin/roles',params)
 }
 
 export function rolePermTree() {
-    return http.get('/role/permTree')
+    if (!isAdminSession()) return http.get('/role/permTree')
+    return http.get('/admin/permissions')
 }
 
 export function roleRoleList() {
-    return http.get('/role/list')
+    if (!isAdminSession()) return http.get('/role/list')
+    return http.get('/admin/roles')
 }
 
 export function roleSet(params) {
-    return http.put('/role/set',params)
+    if (!isAdminSession()) return http.put('/role/set',params)
+    return http.put(`/admin/roles/${params.roleId}`,params)
 }
 
 export function roleDelete(roleId) {
-    return http.delete('/role/delete',{params:{roleId}})
+    if (!isAdminSession()) return http.delete('/role/delete',{params:{roleId}})
+    return http.delete(`/admin/roles/${roleId}`)
 }
 
 export function roleSetDef(roleId) {
-    return http.put('/role/setDefault',{roleId})
+    if (!isAdminSession()) return http.put('/role/setDefault',{roleId})
+    return http.put(`/admin/roles/${roleId}/default`)
 }
 
 
 export function roleSelectUse() {
+    if (isAdminSession()) return http.get('/admin/roles/select-use')
     return http.get('/role/selectUse')
 }

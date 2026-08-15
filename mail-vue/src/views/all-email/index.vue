@@ -2,7 +2,7 @@
   <div class="email-list-box">
     <emailScroll ref="sysEmailScroll"
                  :get-emailList="getEmailList"
-                 :email-delete="allEmailDelete"
+                 :email-delete="deleteEmails"
                  :star-add="starAdd"
                  :star-cancel="starCancel"
                  :show-star="false"
@@ -105,6 +105,7 @@ import {toUtc} from "@/utils/day.js";
 import {sleep} from "@/utils/time-utils.js";
 import {useSettingStore} from "@/store/setting.js";
 import { useRoute } from 'vue-router'
+import {useUserStore} from "@/store/user.js";
 
 defineOptions({
   name: 'all-email'
@@ -113,6 +114,7 @@ defineOptions({
 const route = useRoute()
 const {t} = useI18n();
 const emailStore = useEmailStore();
+const userStore = useUserStore();
 const settingStore = useSettingStore();
 const clearTime = ref('')
 const sysEmailScroll = ref({})
@@ -120,6 +122,7 @@ const searchValue = ref('')
 const mySelect = ref()
 const showBathDelete = ref(false)
 const clearLoading = ref(false)
+const isAdmin = computed(() => userStore.user?.permKeys?.includes('*'))
 
 onMounted(() => {
   latest();
@@ -213,7 +216,7 @@ function batchDelete() {
   ).then(() => {
     clearLoading.value = true
 
-    allEmailBatchDelete(clearParams).then(() => {
+    allEmailBatchDelete(clearParams, isAdmin.value).then(() => {
       ElMessage({
         message: t('clearSuccess'),
         type: "success",
@@ -225,6 +228,10 @@ function batchDelete() {
       clearLoading.value = false
     })
   })
+}
+
+function deleteEmails(emailIds) {
+  return allEmailDelete(emailIds, isAdmin.value)
 }
 
 function rightSearch(type, value) {
@@ -281,7 +288,7 @@ function typeSelectChange() {
 
 function jumpContent(email) {
   emailStore.contentData.email = email
-  emailStore.contentData.delType = 'physics'
+  emailStore.contentData.delType = isAdmin.value ? 'admin' : 'physics'
   emailStore.contentData.showStar = false
   emailStore.contentData.showReply = false
   router.push({name: 'content'})
@@ -289,7 +296,7 @@ function jumpContent(email) {
 
 
 function getEmailList(emailId, size) {
-  return allEmailList({emailId, size, ...params})
+  return allEmailList({emailId, size, ...params}, isAdmin.value)
 }
 
 async function latest() {
@@ -322,7 +329,7 @@ async function latest() {
     try {
 
       const curTimeSort = params.timeSort
-      let list = await allEmailLatest(latestId)
+      let list = await allEmailLatest(latestId, isAdmin.value)
 
       if (list.length === 0) {
         continue

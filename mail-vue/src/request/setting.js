@@ -1,11 +1,14 @@
 import http from '@/axios/index.js';
+import {isAdminSession} from '@/request/admin.js'
 
 export function settingSet(setting) {
-    return http.put('/setting/set',setting)
+    if (!isAdminSession()) return http.put('/setting/set',setting)
+    return http.put('/admin/settings',setting)
 }
 
 export function settingQuery() {
-    return http.get('/setting/query')
+    if (!isAdminSession()) return http.get('/setting/query')
+    return http.get('/admin/settings')
 }
 
 export function websiteConfig() {
@@ -13,9 +16,11 @@ export function websiteConfig() {
 }
 
 export function setBackground(background) {
-    return http.put('/setting/setBackground',{background})
+    if (!isAdminSession()) return http.put('/setting/setBackground',{background})
+    return http.put('/admin/settings/background',{background})
 }
 
 export function deleteBackground() {
-    return http.delete('/setting/deleteBackground')
+    if (!isAdminSession()) return http.delete('/setting/deleteBackground')
+    return http.delete('/admin/settings/background')
 }

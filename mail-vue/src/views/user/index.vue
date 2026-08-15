@@ -470,7 +470,7 @@ const mySelect = ref({})
 const accountList = reactive([])
 const accountParams = reactive({
   size: 10,
-  num: 0,
+  num: 1,
   total: 0,
   userId: 0,
 })
@@ -574,7 +574,7 @@ function accountCurChange(e) {
 
 function resetAccountList() {
   accountList.length = 0
-  accountParams.num = 0
+  accountParams.num = 1
   accountParams.size = 10
   accountParams.total = 0
 }
@@ -1000,10 +1000,6 @@ function getUserList(loading = true) {
   tableLoading.value = loading
   const newParams = {...params}
 
-  if (newParams.status === -2) {
-    delete newParams.status
-    newParams.isDel = 1
-  }
   userList(newParams).then(data => {
     users.value = data.list.map(item => ({...item, checkedClass: ''}))
     total.value = data.total

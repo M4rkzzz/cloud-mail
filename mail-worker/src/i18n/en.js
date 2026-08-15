@@ -65,6 +65,13 @@ const en = {
 	notAdmin: 'The entered email is not an administrator email',
 	emailExistDatabase: 'Email already exists in the database',
 	notConfigOss: 'Object storage not configured',
+	invalidRequestParams: 'Invalid request parameters',
+	invalidId: 'Invalid {{msg}}',
+	emailNotExist: 'Email does not exist',
+	emptyDeleteConditions: 'At least one delete condition is required',
+	accountNotExist: 'Mailbox account does not exist',
+	userNotExist: 'User does not exist',
+	adminAccountProtected: 'The administrator account cannot be disabled, demoted, or deleted',
 	perms: {
 		"邮件": "Emails",
 		"邮件发送": "Send Email",

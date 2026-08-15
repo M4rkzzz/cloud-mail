@@ -194,12 +194,15 @@ const attService = {
 		await this.removeAttByField(c, 'email_id', emailIds);
 	},
 
-	selectByEmailIds(c, emailIds) {
+	selectByEmailIds(c, emailIds, includeEmbedded = false) {
 		return orm(c).select().from(att).where(
-			and(
-				inArray(att.emailId, emailIds),
-				eq(att.type, attConst.type.ATT)
-			))
+			includeEmbedded
+				? inArray(att.emailId, emailIds)
+				: and(
+					inArray(att.emailId, emailIds),
+					eq(att.type, attConst.type.ATT)
+				)
+		)
 			.all();
 	},
 

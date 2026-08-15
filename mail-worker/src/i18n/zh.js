@@ -65,6 +65,13 @@ const zh = {
 	notAdmin: '输入的邮箱不是管理员邮箱',
 	emailExistDatabase: '有邮箱已存在数据库中',
 	notConfigOss: '对象存储未配置',
+	invalidRequestParams: '请求参数不合法',
+	invalidId: '{{msg}} 不合法',
+	emailNotExist: '邮件不存在',
+	emptyDeleteConditions: '至少需要一个删除条件',
+	accountNotExist: '邮箱账号不存在',
+	userNotExist: '用户不存在',
+	adminAccountProtected: '不能禁用、降权或删除管理员账号',
 	perms: {
 		"邮件": "邮件",
 		"邮件发送": "邮件发送",

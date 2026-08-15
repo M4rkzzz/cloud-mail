@@ -71,15 +71,31 @@ http.interceptors.response.use((res) => {
     },
     (error) => {
 
-        if (error.status === 403) {
-            location.reload();
-            return;
-        }
-
-        const noMsg = error.config.noMsg;
+        const status = error.response?.status ?? error.status;
+        const responseData = error.response?.data;
+        const failure = responseData || error;
+        const noMsg = error.config?.noMsg;
 
         if (noMsg) {
-            return Promise.reject(error)
+            return Promise.reject(failure)
+        } else if (status === 401) {
+            ElMessage({
+                message: responseData?.message || i18n.global.t('reqFailErrorMsg'),
+                type: 'error',
+                plain: true,
+                grouping: true,
+                repeatNum: -4,
+            })
+            localStorage.removeItem('token')
+            router.replace('/login')
+        } else if (status === 403) {
+            ElMessage({
+                message: responseData?.message || i18n.global.t('reqFailErrorMsg'),
+                type: 'warning',
+                plain: true,
+                grouping: true,
+                repeatNum: -4,
+            })
         } else if (error.message.includes('Network Error')) {
             ElMessage({
                 message: i18n.global.t('networkErrorMsg'),
@@ -96,6 +112,14 @@ http.interceptors.response.use((res) => {
                 grouping: true
             })
             ElMessage.error('')
+        } else if (responseData?.message) {
+            ElMessage({
+                message: responseData.message,
+                type: 'error',
+                plain: true,
+                grouping: true,
+                repeatNum: -4,
+            })
         } else if (error.response) {
             ElMessage({
                 message: i18n.global.t('serverBusyErrorMsg'),
@@ -113,7 +137,7 @@ http.interceptors.response.use((res) => {
                 repeatNum: -4,
             })
         }
-        return Promise.reject(error)
+        return Promise.reject(failure)
     })
 
 export default http

@@ -12,6 +12,8 @@ import turnstileService from './turnstile-service';
 import roleService from './role-service';
 import { t } from '../i18n/i18n';
 import verifyRecordService from './verify-record-service';
+import { isAdminEmail } from '../security/admin';
+import { isConfiguredDomain } from '../utils/domain-utils';
 
 const accountService = {
 
@@ -35,7 +37,7 @@ const accountService = {
 			throw new BizError(t('notEmail'));
 		}
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c, email)) {
 			throw new BizError(t('notExistDomain'));
 		}
 
@@ -60,7 +62,7 @@ const accountService = {
 		const userRow = await userService.selectById(c, userId);
 		const roleRow = await roleService.selectById(c, userRow.type);
 
-		if (userRow.email !== c.env.admin) {
+		if (!isAdminEmail(c, userRow.email)) {
 
 			if (roleRow.accountCount > 0) {
 				const userAccountCount = await accountService.countUserAccount(c, userId)

@@ -21,6 +21,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import { isAdminEmail } from '../security/admin';
 
 const emailService = {
 
@@ -181,7 +182,7 @@ const emailService = {
 			return domainList.includes(domain);
 		});
 
-		if (c.env.admin !== userRow.email) {
+		if (!isAdminEmail(c, userRow.email)) {
 
 			//发件被禁用
 			if (roleRow.sendType === 'ban') {
@@ -196,7 +197,7 @@ const emailService = {
 		}
 
 		//如果不是管理员，权限设置了发送次数
-		if (c.env.admin !== userRow.email && roleRow.sendCount) {
+		if (!isAdminEmail(c, userRow.email) && roleRow.sendCount) {
 
 			if (userRow.sendCount >= roleRow.sendCount) {
 				if (roleRow.sendType === 'day') throw new BizError(t('daySendLimit'), 403);
@@ -220,7 +221,7 @@ const emailService = {
 			throw new BizError(t('sendEmailNotCurUser'));
 		}
 
-		if (c.env.admin !== userRow.email) {
+		if (!isAdminEmail(c, userRow.email)) {
 			//用户没有这个域名的使用权限
 			if(!roleService.hasAvailDomainPerm(roleRow.availDomain, accountRow.email)) {
 				throw new BizError(t('noDomainPermSend'),403)
@@ -408,7 +409,7 @@ const emailService = {
 				let { banEmail, availDomain } = roleRow;
 
 				//如果收件人没有这个域名的使用权限和有邮件拦截，就把邮件改为拒收状态
-				if (email !== c.env.admin) {
+				if (!isAdminEmail(c, email)) {
 
 					if (!roleService.hasAvailDomainPerm(availDomain, email)) {
 						emailValues.status = emailConst.status.BOUNCED;
@@ -567,6 +568,9 @@ const emailService = {
 	},
 
 	async physicsDeleteUserIds(c, userIds) {
+		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(inArray(email.userId, userIds)).all();
+		const emailIds = rows.map(row => row.emailId);
+		if (emailIds.length) await starService.removeByEmailIds(c, emailIds);
 		await attService.removeByUserIds(c, userIds);
 		await orm(c).delete(email).where(inArray(email.userId, userIds)).run();
 	},
@@ -806,6 +810,9 @@ const emailService = {
 	},
 
 	async physicsDeleteByAccountId(c, accountId) {
+		const rows = await orm(c).select({ emailId: email.emailId }).from(email).where(eq(email.accountId, accountId)).all();
+		const emailIds = rows.map(row => row.emailId);
+		if (emailIds.length) await starService.removeByEmailIds(c, emailIds);
 		await attService.removeByAccountId(c, accountId);
 		await orm(c).delete(email).where(eq(email.accountId, accountId)).run();
 	},

@@ -18,6 +18,8 @@ import { t } from '../i18n/i18n'
 import reqUtils from '../utils/req-utils';
 import {oauth} from "../entity/oauth";
 import oauthService from "./oauth-service";
+import { isAdminEmail } from '../security/admin';
+import { isConfiguredDomain } from '../utils/domain-utils';
 
 const userService = {
 
@@ -32,7 +34,7 @@ const userService = {
 		const [account, roleRow, permKeys] = await Promise.all([
 			accountService.selectByEmailIncludeDel(c, userRow.email),
 			roleService.selectById(c, userRow.type),
-			userRow.email === c.env.admin ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
+			isAdminEmail(c, userRow.email) ? Promise.resolve(['*']) : permService.userPermKeys(c, userId)
 		]);
 
 		const user = {};
@@ -45,7 +47,7 @@ const userService = {
 		user.role = roleRow;
 		user.type = userRow.type;
 
-		if (c.env.admin === userRow.email) {
+		if (isAdminEmail(c, userRow.email)) {
 			user.role = constant.ADMIN_ROLE
 			user.type = 0;
 		}
@@ -58,7 +60,7 @@ const userService = {
 
 		const { password } = params;
 
-		if (password < 6) {
+		if (!password || password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
 		const { salt, hash } = await cryptoUtils.hashPassword(password);
@@ -105,6 +107,7 @@ const userService = {
 		await accountService.physicsDeleteByUserIds(c, userIds);
 		await oauthService.deleteByUserIds(c, userIds);
 		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
+		await Promise.all(userIds.map(userId => c.env.kv.delete(KvConst.AUTH_INFO + userId)));
 	},
 
 	async list(c, params) {
@@ -114,7 +117,9 @@ const userService = {
 		size = Number(size);
 		num = Number(num);
 		timeSort = Number(timeSort);
-		params.isDel = Number(params.isDel);
+		const parsedIsDel = params.isDel === undefined || params.isDel === null || params.isDel === ''
+			? NaN
+			: Number(params.isDel);
 		if (size > 50) {
 			size = 50;
 		}
@@ -134,8 +139,8 @@ const userService = {
 		}
 
 
-		if (params.isDel) {
-			conditions.push(eq(user.isDel, params.isDel));
+		if (!Number.isNaN(parsedIsDel) && [isDel.NORMAL, isDel.DELETE].includes(parsedIsDel)) {
+			conditions.push(eq(user.isDel, parsedIsDel));
 		}
 
 
@@ -206,7 +211,7 @@ const userService = {
 				sendAction.hasPerm = false;
 			}
 
-			if (user.email === c.env.admin) {
+			if (isAdminEmail(c, user.email)) {
 				sendAction.sendType = constant.ADMIN_ROLE.sendType;
 				sendAction.sendCount = constant.ADMIN_ROLE.sendCount;
 				sendAction.hasPerm = true;
@@ -306,11 +311,11 @@ const userService = {
 
 		const { email, type, password } = params;
 
-		if (!c.env.domain.includes(emailUtils.getDomain(email))) {
+		if (!isConfiguredDomain(c, email)) {
 			throw new BizError(t('notEmailDomain'));
 		}
 
-		if (password.length < 6) {
+		if (!password || password.length < 6) {
 			throw new BizError(t('pwdMinLength'));
 		}
 
@@ -324,7 +329,7 @@ const userService = {
 			throw new BizError(t('isRegAccount'));
 		}
 
-		const role = roleService.selectById(c, type);
+		const role = await roleService.selectById(c, type);
 
 		if (!role) {
 			throw new BizError(t('roleNotExist'));

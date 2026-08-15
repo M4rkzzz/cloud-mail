@@ -57,6 +57,8 @@ With only one domain, you can create multiple different email addresses, similar
 
 - **📡 Open API**: Supports batch user creation via API and multi-condition email queries
 
+- **🔐 Administrator API**: Protected `/api/admin/*` endpoints let the configured administrator inspect cross-user message bodies, recipients, and attachments, and manage users, mailboxes, and system settings. See [Administrator API documentation](doc/admin-api.en.md)
+
 - **📈 Data Visualization**: Use ECharts to visualize system data, including user email growth.
 
 - **🎨 Personalization**: Customize website title, login background, and transparency.

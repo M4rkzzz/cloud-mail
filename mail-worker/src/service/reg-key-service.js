@@ -31,7 +31,7 @@ const regKeyService = {
 			throw new BizError(t('isExistRegKye'));
 		}
 
-		const roleRow = roleService.selectById(c, roleId);
+		const roleRow = await roleService.selectById(c, roleId);
 		if (!roleRow) {
 			throw new BizError(t('roleNotExist'));
 		}
@@ -43,7 +43,12 @@ const regKeyService = {
 
 	async delete(c, params) {
 		let {regKeyIds} = params;
-		regKeyIds = regKeyIds.split(',').map(id => Number(id));
+		regKeyIds = (Array.isArray(regKeyIds) ? regKeyIds : String(regKeyIds ?? '').split(','))
+			.filter(id => id !== '')
+			.map(id => Number(id));
+		if (!regKeyIds.length || regKeyIds.some(id => !Number.isInteger(id) || id < 1)) {
+			throw new BizError(t('invalidRequestParams'));
+		}
 		await orm(c).delete(regKey).where(inArray(regKey.regKeyId,regKeyIds)).run();
 	},
 

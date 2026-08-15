@@ -14,6 +14,8 @@ import { isDel, roleConst } from '../const/entity-const';
 import email from '../entity/email';
 import userService from './user-service';
 import KvConst from '../const/kv-const';
+import { isAdminEmail } from '../security/admin';
+import { isConfiguredDomain } from '../utils/domain-utils';
 
 const publicService = {
 
@@ -104,7 +106,7 @@ const publicService = {
 				throw new BizError(t('notEmail'));
 			}
 
-			if (!c.env.domain.includes(emailUtils.getDomain(emailRow.email))) {
+			if (!isConfiguredDomain(c, emailRow.email)) {
 				throw new BizError(t('notEmailDomain'));
 			}
 
@@ -177,7 +179,7 @@ const publicService = {
 
 		const userRow = await userService.selectByEmailIncludeDel(c, email);
 
-		if (email !== c.env.admin) {
+		if (!isAdminEmail(c, email)) {
 			throw new BizError(t('notAdmin'));
 		}
 

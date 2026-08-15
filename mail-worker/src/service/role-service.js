@@ -16,6 +16,9 @@ const roleService = {
 	async add(c, params, userId) {
 
 		let { name, permIds, banEmail, availDomain } = params;
+		permIds = Array.isArray(permIds) ? permIds : [];
+		banEmail = Array.isArray(banEmail) ? banEmail : (banEmail ? String(banEmail).split(',').filter(Boolean) : []);
+		availDomain = Array.isArray(availDomain) ? availDomain : (availDomain ? String(availDomain).split(',').filter(Boolean) : []);
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));
@@ -65,6 +68,9 @@ const roleService = {
 	async setRole(c, params) {
 
 		let { name, permIds, roleId, banEmail, availDomain } = params;
+		permIds = Array.isArray(permIds) ? permIds : [];
+		banEmail = Array.isArray(banEmail) ? banEmail : (banEmail ? String(banEmail).split(',').filter(Boolean) : []);
+		availDomain = Array.isArray(availDomain) ? availDomain : (availDomain ? String(availDomain).split(',').filter(Boolean) : []);
 
 		if (!name) {
 			throw new BizError(t('emptyRoleName'));

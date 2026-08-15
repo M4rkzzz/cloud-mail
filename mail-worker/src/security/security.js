@@ -7,6 +7,7 @@ import userService from '../service/user-service';
 import permService from '../service/perm-service';
 import { t } from '../i18n/i18n'
 import app from '../hono/hono';
+import { isAdminEmail } from './admin';
 
 const exclude = [
 	'/login',
@@ -143,7 +144,7 @@ app.use('*', async (c, next) => {
 			return path.startsWith(item);
 		});
 
-		if (userPermIndex === -1 && authInfo.user.email !== c.env.admin) {
+		if (userPermIndex === -1 && !isAdminEmail(c, authInfo.user.email)) {
 			throw new BizError(t('unauthorized'), 403);
 		}
 
