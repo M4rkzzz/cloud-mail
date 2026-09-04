@@ -1,0 +1,139 @@
+name: Configure Minecraft DNS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configure-dns:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ZONE_NAME: boshan.uk
+
+    steps:
+      - name: Upsert Minecraft A and SRV records
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+            echo "Required Cloudflare repository secrets are missing."
+            exit 1
+          fi
+
+          api="https://api.cloudflare.com/client/v4"
+          auth=(-H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json")
+
+          zone_response=$(curl --fail-with-body --silent --show-error \
+            "${auth[@]}" \
+            "${api}/zones?name=${ZONE_NAME}&account.id=${CLOUDFLARE_ACCOUNT_ID}")
+          ZONE_ID=$(jq -er '.result | if length == 1 then .[0].id else error("zone lookup was not unique") end' <<<"${zone_response}")
+
+          upsert_record() {
+            local type="$1"
+            local name="$2"
+            local payload="$3"
+            local lookup existing_id response
+
+            lookup=$(curl --fail-with-body --silent --show-error \
+              "${auth[@]}" \
+              --get \
+              --data-urlencode "type=${type}" \
+              --data-urlencode "name=${name}" \
+              "${api}/zones/${ZONE_ID}/dns_records")
+            existing_id=$(jq -r '.result[0].id // empty' <<<"${lookup}")
+
+            if [[ -n "${existing_id}" ]]; then
+              response=$(curl --fail-with-body --silent --show-error -X PUT \
+                "${auth[@]}" \
+                --data "${payload}" \
+                "${api}/zones/${ZONE_ID}/dns_records/${existing_id}")
+              action="updated"
+            else
+              response=$(curl --fail-with-body --silent --show-error -X POST \
+                "${auth[@]}" \
+                --data "${payload}" \
+                "${api}/zones/${ZONE_ID}/dns_records")
+              action="created"
+            fi
+
+            jq -e '.success == true' >/dev/null <<<"${response}"
+            echo "${action}: ${type} ${name}"
+          }
+
+          upsert_a() {
+            local name="$1"
+            local address="$2"
+            local payload
+            payload=$(jq -nc \
+              --arg name "${name}" \
+              --arg content "${address}" \
+              '{type:"A", name:$name, content:$content, ttl:1, proxied:false, comment:"Minecraft server endpoint"}')
+            upsert_record "A" "${name}" "${payload}"
+          }
+
+          upsert_srv() {
+            local host="$1"
+            local port="$2"
+            local name="_minecraft._tcp.${host}"
+            local payload
+            payload=$(jq -nc \
+              --arg name "${name}" \
+              --arg target "${host}" \
+              --argjson port "${port}" \
+              '{type:"SRV", name:$name, ttl:1, proxied:false, data:{priority:0, weight:0, port:$port, target:$target}, comment:"Minecraft Java service"}')
+            upsert_record "SRV" "${name}" "${payload}"
+          }
+
+          upsert_a "dc2.mc.boshan.uk" "47.92.219.134"
+          upsert_a "dc2.bk.mc.boshan.uk" "103.40.14.100"
+          upsert_a "mb.mc.boshan.uk" "47.92.219.134"
+          upsert_a "mb.bk.mc.boshan.uk" "103.40.14.100"
+
+          upsert_srv "dc2.mc.boshan.uk" 15456
+          upsert_srv "dc2.bk.mc.boshan.uk" 57905
+          upsert_srv "mb.mc.boshan.uk" 38916
+          upsert_srv "mb.bk.mc.boshan.uk" 21258
+
+      - name: Verify DNS records through Cloudflare API
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          api="https://api.cloudflare.com/client/v4"
+          auth=(-H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}")
+          zone_response=$(curl --fail-with-body --silent --show-error \
+            "${auth[@]}" \
+            "${api}/zones?name=${ZONE_NAME}&account.id=${CLOUDFLARE_ACCOUNT_ID}")
+          ZONE_ID=$(jq -er '.result | if length == 1 then .[0].id else error("zone lookup was not unique") end' <<<"${zone_response}")
+
+          records=$(curl --fail-with-body --silent --show-error \
+            "${auth[@]}" \
+            --get \
+            --data-urlencode "per_page=100" \
+            "${api}/zones/${ZONE_ID}/dns_records")
+
+          jq -e '
+            def one($type; $name): [.result[] | select(.type == $type and .name == $name)] | length == 1;
+            def a($name; $ip): one("A"; $name) and any(.result[]; .type == "A" and .name == $name and .content == $ip and .proxied == false);
+            def srv($host; $port):
+              ("_minecraft._tcp." + $host) as $name |
+              one("SRV"; $name) and any(.result[];
+                .type == "SRV" and .name == $name and
+                .data.priority == 0 and .data.weight == 0 and
+                .data.port == $port and .data.target == $host);
+            a("dc2.mc.boshan.uk"; "47.92.219.134") and
+            a("dc2.bk.mc.boshan.uk"; "103.40.14.100") and
+            a("mb.mc.boshan.uk"; "47.92.219.134") and
+            a("mb.bk.mc.boshan.uk"; "103.40.14.100") and
+            srv("dc2.mc.boshan.uk"; 15456) and
+            srv("dc2.bk.mc.boshan.uk"; 57905) and
+            srv("mb.mc.boshan.uk"; 38916) and
+            srv("mb.bk.mc.boshan.uk"; 21258)
+          ' >/dev/null <<<"${records}"
+
+          echo "Verified all four A records and all four Minecraft SRV records."
